@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# VS Code
+.vscode/*.log
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+
+# Generated outputs
+output/archive/
+output/history/
+output/latest_*.csv
+output/latest_*.xlsx
+output/*.csv
+output/*.xlsx
+
+# Keep folders
+!output/.gitkeep
+!data/.gitkeep
