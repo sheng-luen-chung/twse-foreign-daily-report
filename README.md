@@ -38,7 +38,9 @@ twse-foreign-daily-report/
 ├─ README.md
 ├─ requirements.txt
 ├─ run_latest.bat
-└─ run_with_date.bat
+├─ run_latest.sh
+├─ run_with_date.bat
+└─ run_with_date.sh
 ```
 
 ## 在 VS Code 中使用
@@ -79,22 +81,56 @@ pip install -r requirements.txt
 
 ### 3. 執行
 
+**建議一律使用 UTF-8 模式執行**，避免不同 Windows 電腦的終端機編碼不一致，導致中文股票名稱亂碼。
+
 自動找最近交易日：
 
 ```bash
-python main.py --top 25 --outdir output
+python -X utf8 main.py --top 25 --outdir output
 ```
 
 指定日期：
 
 ```bash
-python main.py --date 20260414 --top 25 --outdir output
+python -X utf8 main.py --date 20260414 --top 25 --outdir output
 ```
 
 不自動回推前一個交易日：
 
 ```bash
-python main.py --date 20260414 --top 25 --outdir output --no-auto-prev
+python -X utf8 main.py --date 20260414 --top 25 --outdir output --no-auto-prev
+```
+
+## Git Bash 中文顯示建議
+
+若在某台 Windows 電腦的 **Git Bash** 看到中文亂碼，先執行：
+
+```bash
+export LANG=zh_TW.UTF-8
+export LC_ALL=zh_TW.UTF-8
+export PYTHONUTF8=1
+export PYTHONIOENCODING=utf-8
+```
+
+若想永久生效，可加入 `~/.bashrc`：
+
+```bash
+export LANG=zh_TW.UTF-8
+export LC_ALL=zh_TW.UTF-8
+export PYTHONUTF8=1
+export PYTHONIOENCODING=utf-8
+```
+
+加入後執行：
+
+```bash
+source ~/.bashrc
+```
+
+然後再測試：
+
+```bash
+python -X utf8 -c "print('台積電 鴻海 聯發科 富邦金 華航')"
 ```
 
 ## 輸出結果
