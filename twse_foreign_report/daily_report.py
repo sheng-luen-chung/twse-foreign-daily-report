@@ -37,6 +37,14 @@ from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from requests.exceptions import SSLError
 
+from .shareholder_distribution import (
+    build_shareholder_distribution_report,
+    print_shareholder_report,
+    save_shareholder_outputs,
+    style_shareholder_sheets,
+    write_shareholder_sheets,
+)
+
 try:
     from zoneinfo import ZoneInfo
 except ImportError:  # pragma: no cover
@@ -613,7 +621,12 @@ def update_history(summary_history_path: Path, summary_row: pd.DataFrame) -> pd.
 
 
 
-def save_outputs(result: BuildResult, outdir: Path, keep_latest: bool = True) -> dict[str, Path]:
+def save_outputs(
+    result: BuildResult,
+    outdir: Path,
+    keep_latest: bool = True,
+    shareholder_result=None,
+) -> dict[str, Path]:
     date = result.date
     outdir.mkdir(parents=True, exist_ok=True)
     archive_dir = outdir / "archive" / date
@@ -630,7 +643,11 @@ def save_outputs(result: BuildResult, outdir: Path, keep_latest: bool = True) ->
         "top_buy_csv": archive_dir / f"twse_foreign_top_buy_{date}.csv",
         "top_sell_csv": archive_dir / f"twse_foreign_top_sell_{date}.csv",
         "summary_csv": archive_dir / f"twse_foreign_summary_{date}.csv",
-        "xlsx": archive_dir / f"twse_foreign_rank_{date}.xlsx",
+        "xlsx": archive_dir / (
+            f"twse_foreign_rank_with_holders_{date}.xlsx"
+            if shareholder_result is not None
+            else f"twse_foreign_rank_{date}.xlsx"
+        ),
         "history_summary_csv": history_dir / "summary_history.csv",
     }
 
@@ -641,6 +658,7 @@ def save_outputs(result: BuildResult, outdir: Path, keep_latest: bool = True) ->
 
     hist = update_history(paths["history_summary_csv"], result.summary)
 
+    shareholder_sheet_names: list[str] = []
     with pd.ExcelWriter(paths["xlsx"], engine="openpyxl") as writer:
         build_dashboard_sheet(writer, result.summary, buy_report, sell_report)
         result.summary.to_excel(writer, sheet_name="summary", index=False)
@@ -648,11 +666,15 @@ def save_outputs(result: BuildResult, outdir: Path, keep_latest: bool = True) ->
         sell_report.to_excel(writer, sheet_name="top_sell", index=False)
         full_report.to_excel(writer, sheet_name="full", index=False)
         hist.to_excel(writer, sheet_name="summary_history", index=False)
+        if shareholder_result is not None:
+            shareholder_sheet_names = write_shareholder_sheets(writer, shareholder_result, sheet_prefix="holders")
 
     wb = load_workbook(paths["xlsx"])
     for name in ["dashboard", "summary", "top_buy", "top_sell", "full", "summary_history"]:
         ws = wb[name]
         style_worksheet(ws)
+    if shareholder_sheet_names:
+        style_shareholder_sheets(wb, shareholder_sheet_names)
 
     # 百分比欄修正：目前 pct 是 3.5 代表 3.5%，Excel 百分比需 /100
     for sheet_name in ["top_buy", "top_sell", "full"]:
@@ -699,12 +721,18 @@ def save_outputs(result: BuildResult, outdir: Path, keep_latest: bool = True) ->
 # -------------------------
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="外資買賣超日報工具 v4")
+    p = argparse.ArgumentParser(description="TWSE 外資日報 / TDCC 股權分散工具")
     p.add_argument("--date", help="日期，格式 YYYYMMDD 或 YYYY-MM-DD；省略則以台北今天為基準")
     p.add_argument("--top", type=int, default=25, help="排行榜筆數，預設 25")
     p.add_argument("--outdir", default="output", help="輸出資料夾，預設 output")
     p.add_argument("--lookback", type=int, default=10, help="自動往前回推最近交易日的最大天數，預設 10")
     p.add_argument("--no-auto-prev", action="store_true", help="不要自動往前找最近交易日")
+    p.add_argument(
+        "--holders-targets",
+        nargs="+",
+        help="查詢集保戶股權分散表，可輸入股票代號或名稱，例如 --holders-targets 鴻海 臻鼎",
+    )
+    p.add_argument("--holders-weeks", type=int, default=3, help="股權分散表比較週數，預設 3")
     return p.parse_args(argv)
 
 
@@ -713,6 +741,41 @@ def main(argv: list[str]) -> int:
     args = parse_args(argv)
     base_date = normalize_date(args.date)
     outdir = Path(args.outdir)
+
+    if args.holders_targets:
+        foreign_result = resolve_build(
+            date=base_date,
+            top_n=args.top,
+            lookback_days=max(0, args.lookback),
+            auto_prev=not args.no_auto_prev,
+        )
+        shareholder_result = build_shareholder_distribution_report(
+            base_date=base_date,
+            targets=args.holders_targets,
+            weeks=args.holders_weeks,
+        )
+        holder_paths = save_shareholder_outputs(shareholder_result, outdir, keep_latest=True)
+        foreign_paths = save_outputs(
+            foreign_result,
+            outdir,
+            keep_latest=True,
+            shareholder_result=shareholder_result,
+        )
+
+        print(f"查詢基準日：{base_date}")
+        print(f"外資實際使用交易日：{foreign_result.date}")
+        print(f"股權分散表週資料：{' / '.join(shareholder_result.selected_dates)}")
+        print("查詢股票：" + ", ".join(f"{item.code} {item.name}" for item in shareholder_result.targets))
+        print_shareholder_report(shareholder_result, include_header=False)
+        print("\n主要輸出：")
+        print(f"- 整合 Excel：{foreign_paths['xlsx'].resolve()}")
+        print(f"- 股權分散表 Excel：{holder_paths['xlsx'].resolve()}")
+        print(f"- 明細 CSV：{holder_paths['detail_csv'].resolve()}")
+        print(f"- 最近兩週變化 CSV：{holder_paths['recent_changes_csv'].resolve()}")
+        print(f"- 變化 CSV：{holder_paths['changes_csv'].resolve()}")
+        print(f"- latest_report.xlsx：{(outdir / 'latest_report.xlsx').resolve()}")
+        print(f"- latest_shareholders_report.xlsx：{(outdir / 'latest_shareholders_report.xlsx').resolve()}")
+        return 0
 
     result = resolve_build(
         date=base_date,
