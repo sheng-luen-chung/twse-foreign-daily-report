@@ -91,6 +91,18 @@ RECOVERABLE_HINTS = (
 )
 
 
+def normalize_security_code(value) -> str:
+    """Normalize TWSE CSV codes such as ="00878 " back to 00878."""
+    if value is None:
+        return ""
+    code = str(value).strip()
+    if code.startswith("="):
+        code = code[1:].strip()
+    if len(code) >= 2 and code[0] == code[-1] == '"':
+        code = code[1:-1].strip()
+    return code.strip()
+
+
 class NoDataError(RuntimeError):
     """該日期無有效交易資料。"""
 
@@ -261,7 +273,7 @@ def parse_foreign_csv(text: str) -> pd.DataFrame:
         if not row:
             continue
         row = row + [""] * (len(header) - len(row))
-        code = row[code_idx].strip()
+        code = normalize_security_code(row[code_idx])
         if not CODE_PATTERN.fullmatch(code):
             continue
         records.append(
@@ -302,7 +314,7 @@ def clean_quotes_df(df: pd.DataFrame) -> pd.DataFrame:
 
     out = pd.DataFrame(
         {
-            "code": df[code_col].astype(str).str.strip(),
+            "code": df[code_col].map(normalize_security_code),
             "name_quote": df[name_col].astype(str).str.strip(),
             "close": df[close_col].map(to_number),
         }
@@ -389,7 +401,7 @@ def parse_quotes_csv(text: str) -> pd.DataFrame:
         if not row:
             continue
         row = row + [""] * (len(header) - len(row))
-        code = row[code_idx].strip()
+        code = normalize_security_code(row[code_idx])
         if not CODE_PATTERN.fullmatch(code):
             continue
         body.append(row[: len(header)])
