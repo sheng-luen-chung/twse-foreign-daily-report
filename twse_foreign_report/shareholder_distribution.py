@@ -485,7 +485,7 @@ def _build_summary_table(raw: pd.DataFrame, targets: list[ResolvedTarget], selec
 def build_shareholder_distribution_report(
     base_date: str,
     targets: list[str],
-    weeks: int = 3,
+    weeks: int = 10,
 ) -> ShareholderBuildResult:
     if weeks < 2:
         raise ValueError("--holders-weeks 至少要 2，這樣才看得到變化。")
@@ -590,11 +590,31 @@ def style_shareholder_sheets(workbook, sheet_names: Iterable[str]) -> None:
         style_worksheet(workbook[sheet_name])
 
 
+def update_shareholder_detail_history(history_path: Path, detail: pd.DataFrame) -> pd.DataFrame:
+    incoming = detail.copy()
+    incoming["code"] = incoming["code"].astype(str)
+    incoming["date"] = incoming["date"].astype(str)
+
+    if history_path.exists():
+        history = pd.read_csv(history_path, dtype={"code": str, "date": str}, encoding="utf-8-sig")
+        history = pd.concat([history, incoming], ignore_index=True)
+        history = history.drop_duplicates(subset=["code", "date", "holding_level"], keep="last")
+        history = history.sort_values(["code", "date", "holding_level"], ascending=[True, False, True]).reset_index(drop=True)
+    else:
+        history = incoming.sort_values(["code", "date", "holding_level"], ascending=[True, False, True]).reset_index(drop=True)
+
+    history_path.parent.mkdir(parents=True, exist_ok=True)
+    history.to_csv(history_path, index=False, encoding="utf-8-sig")
+    return history
+
+
 def save_shareholder_outputs(result: ShareholderBuildResult, outdir: Path, keep_latest: bool = True) -> dict[str, Path]:
     outdir.mkdir(parents=True, exist_ok=True)
     latest_date = result.selected_dates[0]
     archive_dir = outdir / "archive" / latest_date
+    history_dir = outdir / "history"
     archive_dir.mkdir(parents=True, exist_ok=True)
+    history_dir.mkdir(parents=True, exist_ok=True)
     week_suffix = f"w{len(result.selected_dates)}"
 
     paths = {
@@ -603,12 +623,14 @@ def save_shareholder_outputs(result: ShareholderBuildResult, outdir: Path, keep_
         "changes_csv": archive_dir / f"tdcc_shareholders_changes_{latest_date}_{week_suffix}.csv",
         "summary_csv": archive_dir / f"tdcc_shareholders_summary_{latest_date}_{week_suffix}.csv",
         "xlsx": archive_dir / f"tdcc_shareholders_report_{latest_date}_{week_suffix}.xlsx",
+        "detail_history_csv": history_dir / "shareholders_detail_history.csv",
     }
 
     result.detail.to_csv(paths["detail_csv"], index=False, encoding="utf-8-sig")
     result.recent_changes.to_csv(paths["recent_changes_csv"], index=False, encoding="utf-8-sig")
     result.changes.to_csv(paths["changes_csv"], index=False, encoding="utf-8-sig")
     result.summary.to_csv(paths["summary_csv"], index=False, encoding="utf-8-sig")
+    update_shareholder_detail_history(paths["detail_history_csv"], result.detail)
 
     with pd.ExcelWriter(paths["xlsx"], engine="openpyxl") as writer:
         sheet_names = write_shareholder_sheets(writer, result)

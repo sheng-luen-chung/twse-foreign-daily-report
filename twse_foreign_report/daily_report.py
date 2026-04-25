@@ -426,6 +426,70 @@ def fetch_quotes(date: str) -> pd.DataFrame:
         return parse_quotes_csv(text)
 
 
+STOCK_DAY_URLS = [
+    "https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date={month_date}&stockNo={code}",
+    "https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?response=json&date={month_date}&stockNo={code}",
+]
+
+
+def roc_date_to_yyyymmdd(value: str) -> str:
+    parts = str(value).strip().split("/")
+    if len(parts) != 3:
+        return ""
+    year = int(parts[0]) + 1911
+    return f"{year:04d}{int(parts[1]):02d}{int(parts[2]):02d}"
+
+
+def fetch_stock_month_quotes(code: str, month_date: str) -> pd.DataFrame:
+    last_error: Optional[Exception] = None
+    for tpl in STOCK_DAY_URLS:
+        url = tpl.format(month_date=month_date, code=code)
+        try:
+            r = _get_with_ssl_fallback(url, timeout=30)
+            r.raise_for_status()
+            data = r.json()
+            if str(data.get("stat", "")).upper() != "OK":
+                last_error = NoDataError(str(data.get("stat", "")))
+                continue
+            fields = data.get("fields")
+            rows = data.get("data")
+            if not isinstance(fields, list) or not isinstance(rows, list):
+                last_error = NoDataError("STOCK_DAY response missing fields/data")
+                continue
+            date_idx = fields.index("日期")
+            volume_idx = fields.index("成交股數") if "成交股數" in fields else None
+            close_idx = fields.index("收盤價")
+            change_idx = fields.index("漲跌價差") if "漲跌價差" in fields else None
+            records = []
+            for row in rows:
+                date = roc_date_to_yyyymmdd(row[date_idx])
+                close = to_number(row[close_idx])
+                change = to_number(row[change_idx]) if change_idx is not None else None
+                if date and close is not None:
+                    records.append(
+                        {
+                            "date": date,
+                            "code": str(code),
+                            "volume": to_number(row[volume_idx]) if volume_idx is not None else None,
+                            "close": close,
+                            "change": change,
+                        }
+                    )
+            if records:
+                return pd.DataFrame.from_records(records)
+            last_error = NoDataError("STOCK_DAY response contained no parsed prices")
+        except Exception as exc:
+            last_error = exc
+        time.sleep(0.2)
+    raise NoDataError(f"STOCK_DAY 抓取失敗，股票={code}，月份={month_date}，最後錯誤：{last_error}")
+
+
+def previous_month_date(month: str) -> str:
+    dt = datetime.strptime(f"{month}01", "%Y%m%d")
+    previous = dt.replace(day=1) - timedelta(days=1)
+    return previous.strftime("%Y%m01")
+
+
 # -------------------------
 # 合併與統計
 # -------------------------
@@ -632,6 +696,87 @@ def update_history(summary_history_path: Path, summary_row: pd.DataFrame) -> pd.
     return hist
 
 
+def update_price_history(
+    price_history_path: Path,
+    dates: Iterable[str],
+    codes: Iterable[str],
+) -> pd.DataFrame:
+    codes_set = {str(code) for code in codes}
+    existing = pd.DataFrame()
+    if price_history_path.exists():
+        existing = pd.read_csv(price_history_path, dtype={"date": str, "code": str}, encoding="utf-8-sig")
+
+    existing_keys = set()
+    if not existing.empty:
+        existing_keys = set(zip(existing["date"].astype(str), existing["code"].astype(str)))
+        if "volume" not in existing.columns:
+            existing_keys = set()
+        else:
+            missing_volume = existing["volume"].isna()
+            missing_keys = set(zip(existing.loc[missing_volume, "date"].astype(str), existing.loc[missing_volume, "code"].astype(str)))
+            existing_keys = existing_keys - missing_keys
+
+    date_list = [str(date) for date in dates]
+    records: list[dict[str, object]] = []
+    for code in sorted(codes_set):
+        for month in sorted({date[:6] for date in date_list}):
+            month_quotes = fetch_stock_month_quotes(code, f"{month}01")
+            month_dates = [date for date in date_list if date.startswith(month)]
+            target_dates = set(month_dates) | set(month_quotes["date"].astype(str))
+            for target_date in sorted(target_dates):
+                candidates = month_quotes[month_quotes["date"] <= target_date].copy()
+                if candidates.empty:
+                    candidates = fetch_stock_month_quotes(code, previous_month_date(month))
+                    candidates = candidates[candidates["date"] <= target_date].copy()
+                if candidates.empty:
+                    continue
+                row = candidates.sort_values("date").iloc[-1]
+                close = row.get("close")
+                change = row.get("change")
+                pct = None
+                if close is not None and change is not None:
+                    prev_close = float(close) - float(change)
+                    if prev_close:
+                        pct = float(change) / prev_close * 100.0
+                records.append(
+                    {
+                        "date": target_date,
+                        "price_date": str(row["date"]),
+                        "code": str(row["code"]),
+                        "volume": row.get("volume"),
+                        "close": close,
+                        "change": change,
+                        "pct": pct,
+                    }
+                )
+
+    incoming = pd.DataFrame.from_records(records)
+    if existing.empty:
+        history = incoming
+    elif incoming.empty:
+        history = existing
+    else:
+        history = pd.concat([existing, incoming], ignore_index=True)
+
+    if history.empty:
+        history = pd.DataFrame(columns=["date", "code", "close", "change", "pct"])
+    else:
+        history["date"] = history["date"].astype(str)
+        history["code"] = history["code"].astype(str)
+        if "price_date" not in history.columns:
+            history["price_date"] = history["date"]
+        history["price_date"] = history["price_date"].fillna(history["date"]).astype(str)
+        history["price_date"] = history["price_date"].str.replace(r"\.0$", "", regex=True)
+        if "volume" not in history.columns:
+            history["volume"] = None
+        history = history.drop_duplicates(subset=["date", "code"], keep="last")
+        history = history.sort_values(["code", "date"], ascending=[True, False]).reset_index(drop=True)
+
+    price_history_path.parent.mkdir(parents=True, exist_ok=True)
+    history.to_csv(price_history_path, index=False, encoding="utf-8-sig")
+    return history
+
+
 
 def save_outputs(
     result: BuildResult,
@@ -744,7 +889,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         nargs="+",
         help="查詢集保戶股權分散表，可輸入股票代號或名稱，例如 --holders-targets 鴻海 臻鼎",
     )
-    p.add_argument("--holders-weeks", type=int, default=3, help="股權分散表比較週數，預設 3")
+    p.add_argument("--holders-weeks", type=int, default=10, help="股權分散表比較週數，預設 10")
     return p.parse_args(argv)
 
 
@@ -773,6 +918,20 @@ def main(argv: list[str]) -> int:
             keep_latest=True,
             shareholder_result=shareholder_result,
         )
+        from .visual_report import save_visual_outputs
+
+        update_price_history(
+            outdir / "history" / "price_history.csv",
+            shareholder_result.selected_dates,
+            [target.code for target in shareholder_result.targets],
+        )
+
+        visual_paths = save_visual_outputs(
+            foreign_result,
+            shareholder_result,
+            outdir,
+            keep_latest=True,
+        )
 
         print(f"查詢基準日：{base_date}")
         print(f"外資實際使用交易日：{foreign_result.date}")
@@ -787,6 +946,8 @@ def main(argv: list[str]) -> int:
         print(f"- 變化 CSV：{holder_paths['changes_csv'].resolve()}")
         print(f"- latest_report.xlsx：{(outdir / 'latest_report.xlsx').resolve()}")
         print(f"- latest_shareholders_report.xlsx：{(outdir / 'latest_shareholders_report.xlsx').resolve()}")
+        print(f"- Visual dashboard HTML: {visual_paths['html'].resolve()}")
+        print(f"- latest_visual_dashboard.html: {(outdir / 'latest_visual_dashboard.html').resolve()}")
         return 0
 
     result = resolve_build(

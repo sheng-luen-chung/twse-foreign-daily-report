@@ -1,244 +1,104 @@
-# TWSE 外資買賣超日報工具 v4
+# TWSE Foreign Daily Report
 
-這是一個可直接放進 **VS Code** 與 **GitHub** 維護的 Python 專案，用來抓取台灣證券交易所（TWSE）官方資料，產生外資買賣超日報、排行、摘要與 Excel 報表。
+台股籌碼資料整理與視覺化工具。專案會抓取 TWSE 三大法人買賣超、TWSE 股價/成交量，以及 TDCC 集保股權分散資料，輸出 CSV、Excel 與深色系 HTML 視覺報表。
 
-## 目前功能
+## 主要功能
 
-- 抓取 **TWT38U**：外資及陸資買賣超彙總表
-- 抓取 **MI_INDEX**：每日收盤行情
-- 抓取 **TDCC 集保戶股權分散表**：比較各持股級距股東人數變化
-- 自動合併成買超／賣超排行
-- 支援 **自動回推最近交易日**
-- 輸出 CSV、Excel
-- 保留歷史輸出與 latest 固定檔名
-- 已處理常見問題：
-  - SSL 憑證相容性
-  - TWSE CSV 多層／重複表頭
-  - MI_INDEX JSON 結構差異
+- 產生每日外資買賣超排行榜。
+- 依指定股票產生 TDCC 股權分散報表。
+- 預設抓取最近 10 週股權分散資料，後續執行會持續累積歷史資料。
+- 同時顯示多檔股票，例如 `2317 鴻海`、`4958 臻鼎-KY`。
+- 產生 `持股比`、`金字塔`、`股東均張`、`股東人數` 四種視覺頁籤。
+- 補入 TWSE 真實收盤價與成交量，不再只輸出 Excel。
+- 依台灣市場慣例顯示顏色：上漲為紅色，下跌為綠色。
 
-## 建議 repo 名稱
-
-- `twse-foreign-daily-report`
-
-## 專案結構
-
-```text
-twse-foreign-daily-report/
-├─ .vscode/
-│  ├─ launch.json
-│  └─ settings.json
-├─ data/
-│  └─ .gitkeep
-├─ output/
-│  └─ .gitkeep
-├─ twse_foreign_report/
-│  ├─ __init__.py
-│  └─ daily_report.py
-├─ .gitignore
-├─ main.py
-├─ README.md
-├─ requirements.txt
-├─ run_latest.bat
-├─ run_latest.sh
-├─ run_with_date.bat
-└─ run_with_date.sh
-```
-
-## 在 VS Code 中使用
-
-### 1. 建立虛擬環境
-
-在專案根目錄開 Terminal：
-
-```bash
-python -m venv .venv
-```
-
-Windows 啟用：
-
-在 **Git Bash**：
-
-```bash
-source .venv/Scripts/activate
-```
-
-在 **PowerShell**：
+## 安裝
 
 ```powershell
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-在 **cmd**：
-
-```cmd
-.venv\Scripts\activate.bat
-```
-
-### 2. 安裝套件
-
-```bash
 pip install -r requirements.txt
 ```
 
-### 3. 執行
+## 使用方式
 
-**建議一律使用 UTF-8 模式執行**，避免不同 Windows 電腦的終端機編碼不一致，導致中文股票名稱亂碼。
+只產生外資買賣超報表：
 
-#### 只看外資買賣超
-
-自動找最近交易日：
-
-```bash
+```powershell
 python -X utf8 main.py --top 25 --outdir output
 ```
 
 指定日期：
 
-```bash
-python -X utf8 main.py --date 20260414 --top 25 --outdir output
+```powershell
+python -X utf8 main.py --date 20260424 --top 25 --outdir output
 ```
 
-不自動回推前一個交易日：
+產生股權分散與視覺報表：
 
-```bash
-python -X utf8 main.py --date 20260414 --top 25 --outdir output --no-auto-prev
+```powershell
+python -X utf8 main.py --holders-targets 2317 4958 --outdir output
 ```
 
-說明：
+指定週數：
 
-- 不帶 `--holders-targets` 時，就是純外資買賣超模式
-- 主要看 `latest_report.xlsx`、`latest_top_buy.csv`、`latest_top_sell.csv`
-
-#### 看股東分散表
-
-查集保戶股權分散表，可直接輸入股票名稱：
-
-```bash
-python -X utf8 main.py --date 20260419 --holders-targets 鴻海 臻鼎 --holders-weeks 3 --outdir output
+```powershell
+python -X utf8 main.py --holders-targets 2317 4958 --holders-weeks 10 --outdir output
 ```
 
-也可直接輸入代號：
+## 輸出檔案
 
-```bash
-python -X utf8 main.py --holders-targets 2317 4958 --holders-weeks 3 --outdir output
+主要輸出會放在 `output/`：
+
+- `latest_foreign_report.csv`
+- `latest_foreign_report.xlsx`
+- `latest_shareholders_distribution.csv`
+- `latest_shareholders_distribution.xlsx`
+- `latest_visual_dashboard.html`
+- `archive/YYYYMMDD/visual_dashboard_YYYYMMDD.html`
+
+歷史資料會放在 `output/history/`：
+
+- `shareholders_summary_history.csv`
+- `shareholders_detail_history.csv`
+- `price_history.csv`
+
+`latest_visual_dashboard.html` 與其他 HTML 報表屬於產物，已加入 `.gitignore`，避免每次產生報表時污染版本控制。
+
+## 視覺報表
+
+HTML 視覺報表目前包含四個頁籤：
+
+- `持股比`：顯示 1000 張以上大戶持股比例、50 張以下散戶持股比例、股價。
+- `金字塔`：顯示各持股級距的股東人數、持股比例與週變化；點擊上方日期會切換到該週真實資料。
+- `股東均張`：顯示每位股東平均持有張數、均張增減、週轉率與股價。
+- `股東人數`：顯示總股東人數、人數增減、股價與成交量。
+
+### 指標定義
+
+`股東均張`：
+
+```text
+TDCC 集保總股數 / 總股東人數 / 1000
 ```
 
-說明：
+`週轉率`：
 
-- `--holders-targets` 會額外查 TDCC 股權分散表，並把 `holders_*` 工作表整合進 `latest_report.xlsx`
-- `--holders-weeks` 預設為 `3`，會抓查詢日以前最近 3 週可用資料
-- `--date` 在這個模式下代表「往前找到這一天以前最近可用的週資料」
-- 另外也會保留獨立的 `latest_shareholders_report.xlsx` 與對應 CSV
-- 其中 `recent_changes` / `latest_shareholders_recent_changes.csv` 會直接列出最近兩週各持股級距的人數增減與張數增減
-- 如果只想看外資買賣超，不要加 `--holders-targets`
-
-`recent_changes` 主要欄位：
-
-- `holders_YYYYMMDD`：該週該持股級距的股東人數
-- `holders_change_新週_vs_舊週`：最近兩週股東人數增減
-- `shares_YYYYMMDD`：該週該持股級距的總股數
-- `shares_change_新週_vs_舊週`：最近兩週總股數增減
-- `shares_lots_YYYYMMDD`：把總股數換算成張數
-- `lots_change_新週_vs_舊週`：最近兩週總股數增減張數
-
-範例解讀：
-
-- 以 `2317 鴻海`、持股分級 `1-999` 為例：
-- `holders_20260417 = 432714`、`holders_20260410 = 437843`，表示這個持股級距的股東人數從前一週的 `437,843` 人，變成最新一週的 `432,714` 人
-- `holders_change_20260417_vs_20260410 = -5129`，表示最近兩週這個級距少了 `5,129` 位股東
-- `shares_20260417 = 104425588`、`shares_20260410 = 105578153`，表示這個級距合計持有股數從 `105,578,153` 股降到 `104,425,588` 股
-- `lots_change_20260417_vs_20260410 = -1152.565`，表示換算後最近兩週少了 `1,152.565` 張
-
-## Git Bash 中文顯示建議
-
-若在某台 Windows 電腦的 **Git Bash** 看到中文亂碼，先執行：
-
-```bash
-export LANG=zh_TW.UTF-8
-export LC_ALL=zh_TW.UTF-8
-export PYTHONUTF8=1
-export PYTHONIOENCODING=utf-8
+```text
+該週區間 TWSE 成交股數合計 / 當週 TDCC 集保總股數 * 100
 ```
 
-若想永久生效，可加入 `~/.bashrc`：
+週區間採用上一筆 TDCC 週資料日期之後，到本週 TDCC 日期為止。若 TDCC 日期不是交易日，股價欄位會使用該日期以前最近一個 TWSE 交易日收盤資料。
 
-```bash
-export LANG=zh_TW.UTF-8
-export LC_ALL=zh_TW.UTF-8
-export PYTHONUTF8=1
-export PYTHONIOENCODING=utf-8
-```
+## 資料來源
 
-加入後執行：
+- TWSE 外資買賣超資料。
+- TWSE `STOCK_DAY` 每日股價與成交量。
+- TDCC 股權分散表。
+- TWSE ISIN 基本資料，用於補中文股票名稱。
 
-```bash
-source ~/.bashrc
-```
+## 注意事項
 
-然後再測試：
-
-```bash
-python -X utf8 -c "print('台積電 鴻海 聯發科 富邦金 華航')"
-```
-
-## 輸出結果
-
-程式會在 `output/` 之下產生：
-
-- `latest_full.csv`
-- `latest_top_buy.csv`
-- `latest_top_sell.csv`
-- `latest_summary.csv`
-- `latest_report.xlsx`
-- `latest_shareholders_detail.csv`
-- `latest_shareholders_recent_changes.csv`
-- `latest_shareholders_changes.csv`
-- `latest_shareholders_summary.csv`
-- `latest_shareholders_report.xlsx`
-- `archive/YYYYMMDD/` 每日歷史檔
-- `history/summary_history.csv`
-
-## VS Code 執行方式
-
-你可以直接用：
-
-- `Run and Debug` → `TWSE 日報：自動最近交易日`
-- `Run and Debug` → `TWSE 日報：指定日期`
-
-## 建議的 Git 初始化流程
-
-```bash
-git init
-git branch -M main
-git add .
-git commit -m "Initial commit: TWSE foreign daily report v4"
-```
-
-如果你已經先在 GitHub 建好空 repo：
-
-```bash
-git remote add origin git@github.com:YOUR_ACCOUNT/twse-foreign-daily-report.git
-git push -u origin main
-```
-
-## 下一步建議
-
-這個版本已經能當成小型資料產品的骨架。真正值得再升級的方向有：
-
-1. 加入 **上市 + 上櫃** 合併排行
-2. 加入 **外資連買／連賣天數**
-3. 加入 **借券賣出餘額** 交叉分析
-4. 加入 **排程**（Windows 工作排程器 / GitHub Actions）
-5. 加入 **多日趨勢圖** 與簡易 dashboard
-
-## 你可以怎麼擴充
-
-若你之後要發展成研究或教學 demo，可以把功能分成：
-
-- `fetch`：資料抓取
-- `parse`：格式解析
-- `transform`：統計整理
-- `export`：CSV / Excel / 圖表輸出
-- `schedule`：每日自動執行
-
-這樣後續維護會比把所有邏輯擠在單一腳本中容易很多。
+- 報表資料仰賴公開網站回應，若 TWSE 或 TDCC 調整格式，可能需要同步更新 parser。
+- `週轉率` 是本專案明確定義的週區間成交量比率，券商 App 可能使用不同分母、期間或內部資料，因此數字不一定完全一致。
+- 建議使用 `python -X utf8` 執行，避免 Windows 終端機中文編碼問題。

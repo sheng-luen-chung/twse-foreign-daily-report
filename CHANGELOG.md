@@ -1,68 +1,81 @@
 # Changelog
 
-本檔案用來記錄這個專案的重要版本變更。
-
-格式參考 `Keep a Changelog`，版本號以 Git tag 為主。
+All notable changes to this project are documented here.
 
 ## [Unreleased]
 
-- 尚未整理成下一版的正式變更
+- Next version TBD.
+
+## [v0.3.0] - 2026-04-25
+
+### Added
+
+- Added dark HTML chip dashboard output:
+  - `output/latest_visual_dashboard.html`
+  - `output/archive/YYYYMMDD/visual_dashboard_YYYYMMDD.html`
+- Added `twse_foreign_report/visual_report.py` for HTML report generation.
+- Added 10-week shareholder visualization for multiple target stocks on the same page.
+- Added interactive dashboard tabs:
+  - `持股比`
+  - `金字塔`
+  - `股東均張`
+  - `股東人數`
+- Added interactive pyramid date switching. Selecting a week updates holder counts, holding ratios, and weekly changes by holding bucket.
+- Added cumulative TDCC shareholder detail history:
+  - `output/history/shareholders_detail_history.csv`
+- Added TWSE `STOCK_DAY` quote/volume history cache:
+  - `output/history/price_history.csv`
+- Added shareholder-average-lots view:
+  - `股東均張 = 集保總股數 / 總股東人數 / 1000`
+  - `均張增減 = 本週股東均張 - 前一週股東均張`
+  - `週轉率 = 週期間成交股數合計 / 當週集保總股數 * 100`
+- Added stock price and trading volume columns to the shareholder-count view.
+
+### Changed
+
+- Changed default `--holders-weeks` from `3` to `10`.
+- Dashboard tables now show the latest date first, then older dates below.
+- Dashboard now uses cumulative history files so new weekly data can be appended over time.
+- Price color convention now follows Taiwan/China market convention:
+  - red for up
+  - green for down
+- Removed non-real bid/ask placeholder values from the visual dashboard.
+- Historical prices are no longer backfilled from the latest close. They are sourced from TWSE `STOCK_DAY`.
+- If a TDCC weekly date is not a trading day, the dashboard uses the latest previous trading-day close and preserves `price_date` in the cache.
+- `.gitignore` now ignores generated HTML report files.
+
+### Notes
+
+- TDCC holder counts, shares, and holding ratios are sourced from the TDCC shareholder distribution table.
+- Prices, price changes, and trading volumes are sourced from TWSE `STOCK_DAY`.
+- The dashboard turnover ratio is this project's explicit estimate: `weekly traded shares / TDCC total shares * 100`. Broker apps may use a different private definition.
 
 ## [v0.2.0] - 2026-04-20
 
 ### Added
 
-- 新增 TDCC 集保戶股權分散表分析功能
-- 新增以股票名稱或代號查詢股東分散資料的流程
-- 新增最近兩週股東人數增減與張數增減輸出
-- 新增股東分散表專用 CSV：
-  - `latest_shareholders_detail.csv`
-  - `latest_shareholders_recent_changes.csv`
-  - `latest_shareholders_changes.csv`
-  - `latest_shareholders_summary.csv`
-- 新增股東分散表專用 Excel：
-  - `latest_shareholders_report.xlsx`
-- 新增將股東分散表工作表整合進 `latest_report.xlsx` 的能力
-- 新增專案文件：
-  - `PROJECT_OVERVIEW.md`
-  - `RELEASE_NOTES_v0.2.0.md`
+- Added TDCC shareholder distribution report support.
+- Added stock-code and stock-name target resolution.
+- Added weekly shareholder change outputs:
+  - detail
+  - recent two-week changes
+  - multi-week changes
+  - summary
+- Added standalone shareholder CSV and Excel outputs.
+- Added `holders_*` worksheets to the integrated `latest_report.xlsx` when `--holders-targets` is used.
+- Added project documentation and release notes.
 
 ### Changed
 
-- `main.py` / `daily_report.py` 現在支援外資模式與股東分散模式的雙流程
-- `latest_report.xlsx` 在使用 `--holders-targets` 時會額外包含：
-  - `holders_overview`
-  - `holders_summary`
-  - `holders_recent_changes`
-  - `holders_changes`
-  - `holders_detail`
-- `README.md` 補充了：
-  - 外資模式與股東分散模式的使用方式
-  - `recent_changes` 欄位解讀
-  - 以鴻海為例的實際解讀方式
-- `.gitignore` 補上常見 Python 開發暫存與快取忽略規則
-
-### Notes
-
-- 這版是專案從「TWSE 外資買賣超工具」擴充到「外資日報 + TDCC 股東分散分析工具」的重要版本
-- Git tag：`v0.2.0`
-- GitHub Release 已建立
+- Extended the original TWSE foreign-investor report workflow with optional shareholder-distribution reporting.
+- Updated README usage examples for TDCC shareholder mode.
 
 ## [v0.1.0] - 2026-04-15
 
 ### Added
 
-- 初始版 TWSE 外資買賣超日報工具
-- 支援抓取 TWSE 外資及陸資買賣超資料
-- 支援抓取 TWSE 每日收盤行情資料
-- 產生：
-  - 買超排行
-  - 賣超排行
-  - 完整明細
-  - 摘要
-  - Excel 報表
-
-### Changed
-
-- 2026-04-16 補強 Windows / UTF-8 終端輸出穩定性
-- 2026-04-16 調整 import 與執行環境設定，改善 Windows 中文顯示體驗
+- Initial TWSE foreign-investor daily report workflow.
+- Added TWSE TWT38U foreign buy/sell data retrieval.
+- Added TWSE quote retrieval.
+- Added CSV and Excel exports.
+- Added top buy, top sell, full report, summary, and summary history outputs.
