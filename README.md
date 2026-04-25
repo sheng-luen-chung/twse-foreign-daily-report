@@ -34,17 +34,43 @@ python -X utf8 main.py --top 25 --outdir output
 python -X utf8 main.py --date 20260424 --top 25 --outdir output
 ```
 
-產生股權分散與視覺報表：
+產生股權分散與視覺報表。`--holders-targets` 後面可以接多檔台股股票代號或名稱：
 
 ```powershell
 python -X utf8 main.py --holders-targets 2317 4958 --outdir output
 ```
 
-指定週數：
+### 多檔比較範例
+
+比較兩檔，例如 `3189 景碩` 與 `4958 臻鼎-KY`：
 
 ```powershell
-python -X utf8 main.py --holders-targets 2317 4958 --holders-weeks 10 --outdir output
+python -X utf8 main.py --holders-targets 3189 4958 --outdir output
 ```
+
+比較三檔，例如 `3037 欣興`、`4958 臻鼎-KY`、`2368 金像電`：
+
+```powershell
+python -X utf8 main.py --holders-targets 3037 4958 2368 --outdir output
+```
+
+比較三檔並指定最近 10 週資料：
+
+```powershell
+python -X utf8 main.py --holders-targets 3037 4958 2368 --holders-weeks 10 --outdir output
+```
+
+### 常用 options
+
+| Option | 說明 | 範例 |
+| --- | --- | --- |
+| `--holders-targets` | 要比較的股票標的，可接多檔代號或名稱。 | `--holders-targets 3037 4958 2368` |
+| `--holders-weeks` | 股權分散表比較週數，預設 10，至少要 2。 | `--holders-weeks 10` |
+| `--date` | 查詢基準日，未指定時使用台北時間今天，並自動往前找最近交易日。 | `--date 20260424` |
+| `--outdir` | 輸出目錄，預設建議使用 `output`。 | `--outdir output` |
+| `--top` | 外資買賣超排行榜顯示檔數。 | `--top 25` |
+
+跑完多檔比較後，直接開啟 `output/latest_visual_dashboard.html` 查看互動視覺報表。桌機寬螢幕目前以兩欄排列，因此三檔會顯示成第一列兩檔、第二列一檔。
 
 ## 輸出檔案
 
