@@ -1,6 +1,17 @@
 {
-  "python.defaultInterpreterPath": "C:\\Users\\sheng\\github-repo\\twse-foreign-daily-report-fixed\\.venv\\Scripts\\python.exe",
+  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
   "python.terminal.activateEnvironment": true,
+  "terminal.integrated.defaultProfile.windows": "Project PowerShell",
+  "terminal.integrated.profiles.windows": {
+    "Project PowerShell": {
+      "source": "PowerShell",
+      "args": [
+        "-NoExit",
+        "-File",
+        "${workspaceFolder}\\.vscode\\profile.ps1"
+      ]
+    }
+  },
   "files.exclude": {
     "**/__pycache__": true
   }
