@@ -7,7 +7,7 @@
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
       "console": "integratedTerminal",
-      "python": "C:\\Users\\sheng\\github-repo\\twse-foreign-daily-report-fixed\\.venv\\Scripts\\python.exe",
+      "python": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
       "args": [
         "--top",
         "25",
@@ -21,7 +21,7 @@
       "request": "launch",
       "program": "${workspaceFolder}/main.py",
       "console": "integratedTerminal",
-      "python": "C:\\Users\\sheng\\github-repo\\twse-foreign-daily-report-fixed\\.venv\\Scripts\\python.exe",
+      "python": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
       "args": [
         "--date",
         "20260414",

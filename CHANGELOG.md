@@ -4,7 +4,17 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
-- Next version TBD.
+### Changed
+
+- Updated `run_latest.bat` to call `.\.venv\Scripts\python.exe` directly on Windows.
+- Updated `run_with_date.bat` to call `.\.venv\Scripts\python.exe` directly on Windows.
+- Updated `.vscode/launch.json` and `.vscode/settings.json` to use `${workspaceFolder}`-relative interpreter paths instead of a machine-specific absolute path.
+- Added `.vscode/profile.ps1` and configured the VS Code integrated terminal to auto-activate the project virtual environment.
+
+### Documentation
+
+- Added Windows environment notes to `README.md`.
+- Added `ENVIRONMENT_TROUBLESHOOTING.md` to explain the expected `.venv`-based workflow and recovery steps.
 
 ## [v0.3.0] - 2026-04-25
 

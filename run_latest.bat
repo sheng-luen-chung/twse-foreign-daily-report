@@ -1,3 +1,3 @@
 @echo off
-python main.py --top 25 --outdir output
+call .\.venv\Scripts\python.exe main.py --top 25 --outdir output
 pause

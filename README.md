@@ -20,6 +20,17 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+## Windows environment quick start
+
+If you are on Windows, keep the project's virtual environment at `.venv/`.
+
+- `run_latest.bat` now calls `.\.venv\Scripts\python.exe` directly.
+- `run_with_date.bat` now calls `.\.venv\Scripts\python.exe` directly.
+- `.vscode/settings.json` now points `python.defaultInterpreterPath` to `${workspaceFolder}\\.venv\\Scripts\\python.exe`.
+- `.vscode/profile.ps1` activates the virtual environment automatically when VS Code opens the project PowerShell profile.
+
+If `.venv` does not exist yet, run the setup commands above first.
+
 ## 使用方式
 
 只產生外資買賣超報表：
